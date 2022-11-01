@@ -22,9 +22,9 @@ SOURCE=$1
 URL=""
 
 if [[ "$SOURCE" == "stable" ]] ; then
-	URL="https://www.ispconfig.org/downloads/ISPConfig-3-stable.tar.gz"
+	URL="https://download.ispconfig.org/ISPConfig-3-stable.tar.gz"
 elif [[ "$SOURCE" == "nightly" ]] ; then
-	URL="https://www.ispconfig.org/downloads/ISPConfig-3-nightly.tar.gz"
+	URL="https://download.ispconfig.org/ISPConfig-3-nightly.tar.gz"
 elif [[ "$SOURCE" == "git-develop" ]] ; then
 	URL="https://git.ispconfig.org/ispconfig/ispconfig3/-/archive/develop/ispconfig3-develop.tar.gz"
 else 

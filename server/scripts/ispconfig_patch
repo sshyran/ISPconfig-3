@@ -127,13 +127,13 @@ if($patch_id == '') {
     die();
 }
 
-$patch_data = @file_get_contents('https://ispconfig.org/downloads/patches/' . $patch_id . '.diff');
+$patch_data = @file_get_contents('https://download.ispconfig.org/patches/' . $patch_id . '.diff');
 if(!$patch_data) {
     swriteln("Patch with id " . $patch_id . " does not exist.\n");
     die();
 }
 
-$patch_text = @file_get_contents('https://ispconfig.org/downloads/patches/' . $patch_id . '.txt');
+$patch_text = @file_get_contents('https://download.ispconfig.org/patches/' . $patch_id . '.txt');
 if($patch_text) {
     if($auto) {
 		$ok = 'y';

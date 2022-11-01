@@ -91,7 +91,7 @@ echo "Please choose the update method. For production systems select 'stable'. \
 $method = simple_query('Select update method', array('stable', 'nightly', 'git-develop'), 'stable');
 
 if($method == 'stable') {
-	$new_version = @file_get_contents('https://www.ispconfig.org/downloads/ispconfig3_version.txt') or die('Unable to retrieve version file.');
+	$new_version = @file_get_contents('https://download.ispconfig.org/ispconfig3_version.txt') or die('Unable to retrieve version file.');
 	$new_version = trim($new_version);
 	if(version_compare($new_version, ISPC_APP_VERSION, '<=') && !in_array('--force', $argv, true)) {
 		echo "There are no updates available for ISPConfig ".ISPC_APP_VERSION."\n";
