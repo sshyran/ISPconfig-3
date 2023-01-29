@@ -432,7 +432,7 @@ class letsencrypt {
 					// TODO BEFORE MERGING: strip subdomains from $temp_domain as $root_temp_domain
 					if($app->dbmaster->queryOneRecord("SELECT * FROM dns_soa WHERE origin = ? AND active = 'y'", $root_temp_domain . ".") != null) {
 						$le_domains[] = $temp_domain;
-						$app->log("Verified domain " . $temp_domain . " has a DNS zone for the acme (Let's Encrypt) challenge.", LOGLEVEL_DEBUG);
+						$app->log("Verified domain " . $temp_domain . " has a DNS zone in this setup for the acme (Let's Encrypt) challenge.", LOGLEVEL_DEBUG);
 					} else {
 						$app->log("Could not verify that domain " . $temp_domain . " has a DNS zone in this setup, so excluding it from Let\'s Encrypt request.", LOGLEVEL_WARN);
 					}
