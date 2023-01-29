@@ -78,7 +78,15 @@ class letsencrypt {
 		}
 
 		$dns = '';
-		if($global_sites_config['acme_dns_ISPC_User'] != '') {
+		if($global_sites_config['acme_dns_user'] != '') {
+			$dns_ISPC_User = $global_sites_config['acme_dns_user'];
+			$dns_ISPC_Password = $global_sites_config['acme_dns_password'];
+			$dns_ISPC_Api = $global_sites_config['acme_dns_api'];
+			if ($global_sites_config['acme_dns_api_insecure'] == "y") {
+				$dns_ISPC_Api_Insecure = "1";
+			} else {
+				$dns_ISPC_Api_Insecure = "0";
+			}
 			$dns_variables = array();
 			$dns_variables[] = "ISPC_User=" . $dns_ISPC_User;
 			$dns_variables[] = "ISPC_Password=" . $dns_ISPC_Password;
@@ -412,7 +420,7 @@ class letsencrypt {
 			if((isset($web_config['skip_le_check']) && $web_config['skip_le_check'] == 'y') || (isset($server_config['migration_mode']) && $server_config['migration_mode'] == 'y')) {
 				$le_domains[] = $temp_domain;
 			} else {
-				if($global_sites_config['acme_dns_ISPC_User'] != '') {
+				if($global_sites_config['acme_dns_user'] != '') {
 					$le_hash_check = trim(@file_get_contents('http://' . $temp_domain . '/.well-known/acme-challenge/' . $le_rnd_file));
 					if($le_hash_check == $le_rnd_hash) {
 						$le_domains[] = $temp_domain;
