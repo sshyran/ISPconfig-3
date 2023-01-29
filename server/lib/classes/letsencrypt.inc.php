@@ -56,6 +56,9 @@ class letsencrypt {
 	public function get_acme_command($domains, $key_file, $bundle_file, $cert_file, $server_type = 'apache') {
 		global $app, $conf;
 
+		$app->uses('getconf');
+		$global_sites_config = $app->getconf->get_global_config('sites');
+
 		$letsencrypt = $this->get_acme_script();
 
 		$cmd = '';
@@ -74,7 +77,29 @@ class letsencrypt {
 			$cert_arg = '--fullchain-file ' . escapeshellarg($bundle_file) . ' --cert-file ' . escapeshellarg($cert_file);
 		}
 
-		$cmd = 'R=0 ; C=0 ; ' . $letsencrypt . ' --issue ' . $cmd . ' -w /usr/local/ispconfig/interface/acme --always-force-new-domain-key --keylength 4096; R=$? ; if [ $R -eq 0 -o $R -eq 2 ] ; then ' . $letsencrypt . ' --install-cert ' . $cmd . ' --key-file ' . escapeshellarg($key_file) . ' ' . $cert_arg . ' --reloadcmd ' . escapeshellarg($this->get_reload_command()) . ' --log ' . escapeshellarg($conf['ispconfig_log_dir'].'/acme.log') . '; C=$? ; fi ; if [ $C -eq 0 ] ; then exit $R ; else exit $C  ; fi';
+		$dns = '';
+		if($global_sites_config['acme_dns_ISPC_User'] != '') {
+			$dns_variables = array();
+			$dns_variables[] = "ISPC_User=" . $dns_ISPC_User;
+			$dns_variables[] = "ISPC_Password=" . $dns_ISPC_Password;
+			$dns_variables[] = "ISPC_Api=" . $dns_ISPC_Api;
+			$dns_variables[] = "ISPC_Api_Insecure=" . $dns_ISPC_Api_Insecure;
+			$dns_variables_cmd = '';
+			foreach($dns_variables as $dns_variable) {
+				$dns_variables_cmd .= $dns_variable . ' ; ';
+			}
+			$dns = ' --dns dns_ispconfig ';
+		}
+
+		if($dns == '') {
+			return false;
+		}
+
+		if($dns_variables_cmd == '') {
+			return false;
+		}
+
+		$cmd = $dns_variables_cmd . 'R=0 ; C=0 ; ' . $letsencrypt . ' --issue ' . $dns . $cmd . ' -w /usr/local/ispconfig/interface/acme --always-force-new-domain-key --keylength 4096; R=$? ; if [ $R -eq 0 -o $R -eq 2 ] ; then ' . $letsencrypt . ' --install-cert ' . $cmd . ' --key-file ' . escapeshellarg($key_file) . ' ' . $cert_arg . ' --reloadcmd ' . escapeshellarg($this->get_reload_command()) . ' --log ' . escapeshellarg($conf['ispconfig_log_dir'].'/acme.log') . '; C=$? ; fi ; if [ $C -eq 0 ] ; then exit $R ; else exit $C  ; fi';
 
 		return $cmd;
 	}
@@ -276,9 +301,9 @@ class letsencrypt {
 
 		if($data['new']['ssl'] == 'y' && $data['new']['ssl_letsencrypt'] == 'y') {
 			$domain = $data['new']['domain'];
-			if(substr($domain, 0, 2) === '*.') {
-				// wildcard domain not yet supported by letsencrypt!
-				$app->log('Wildcard domains not yet supported by letsencrypt, so changing ' . $domain . ' to ' . substr($domain, 2), LOGLEVEL_WARN);
+			if(substr($domain, 0, 2) === '*.' && $use_acme = false) {
+				// DNS-01 verification is needed for wildcard certificate requests, but we do not support that for Certbot.
+				$app->log('Requesting a wildcard certificate from Let\'s Encrypt is not support when using certbot, so changing ' . $domain . ' to ' . substr($domain, 2), LOGLEVEL_WARN);
 				$domain = substr($domain, 2);
 			}
 		}
@@ -387,12 +412,22 @@ class letsencrypt {
 			if((isset($web_config['skip_le_check']) && $web_config['skip_le_check'] == 'y') || (isset($server_config['migration_mode']) && $server_config['migration_mode'] == 'y')) {
 				$le_domains[] = $temp_domain;
 			} else {
-				$le_hash_check = trim(@file_get_contents('http://' . $temp_domain . '/.well-known/acme-challenge/' . $le_rnd_file));
-				if($le_hash_check == $le_rnd_hash) {
-					$le_domains[] = $temp_domain;
-					$app->log("Verified domain " . $temp_domain . " should be reachable for letsencrypt.", LOGLEVEL_DEBUG);
-				} else {
-					$app->log("Could not verify domain " . $temp_domain . ", so excluding it from letsencrypt request.", LOGLEVEL_WARN);
+				if($global_sites_config['acme_dns_ISPC_User'] != '') {
+					$le_hash_check = trim(@file_get_contents('http://' . $temp_domain . '/.well-known/acme-challenge/' . $le_rnd_file));
+					if($le_hash_check == $le_rnd_hash) {
+						$le_domains[] = $temp_domain;
+						$app->log("Verified domain " . $temp_domain . " should be reachable for letsencrypt.", LOGLEVEL_DEBUG);
+					} else {
+						$app->log("Could not verify domain " . $temp_domain . ", so excluding it from letsencrypt request.", LOGLEVEL_WARN);
+					}
+				}  else {
+					// TODO BEFORE MERGING: strip subdomains from $temp_domain as $root_temp_domain
+					if($app->dbmaster->queryOneRecord("SELECT * FROM dns_soa WHERE origin = ? AND active = 'y'", $root_temp_domain . ".") != null) {
+						$le_domains[] = $temp_domain;
+						$app->log("Verified domain " . $temp_domain . " has a DNS zone for the acme (Let's Encrypt) challenge.", LOGLEVEL_DEBUG);
+					} else {
+						$app->log("Could not verify that domain " . $temp_domain . " has a DNS zone in this setup, so excluding it from Let\'s Encrypt request.", LOGLEVEL_WARN);
+					}
 				}
 			}
 		}
