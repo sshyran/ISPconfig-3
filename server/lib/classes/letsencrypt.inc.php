@@ -428,9 +428,21 @@ class letsencrypt {
 					} else {
 						$app->log("Could not verify domain " . $temp_domain . ", so excluding it from letsencrypt request.", LOGLEVEL_WARN);
 					}
-				}  else {
-					// TODO BEFORE MERGING: strip subdomains from $temp_domain as $root_temp_domain
-					if($app->dbmaster->queryOneRecord("SELECT * FROM dns_soa WHERE origin = ? AND active = 'y'", $root_temp_domain . ".") != null) {
+				} else { // DNS-01 verification
+					$temp_domain_parts = preg_split("/[.]/", $temp_domain);
+					foreach ($temp_domain_parts as $temp_domain_part) {
+						if (isset($temp_domain_parts['1'])) {
+							$queryDomains[] = preg_replace("/.*" . $temp_domain_parts['0'] . "\." . "/", "", $temp_domain);
+							array_shift($temp_domain_parts);
+							print_r($temp_domain_parts);
+						}
+					}
+					$queryOr = "origin = " . $temp_domain . ".";
+					foreach ($queryDomains as $domain) {
+						$queryOr .= " OR origin = " . $domain . ".";
+					}
+					
+					if($app->dbmaster->queryOneRecord("SELECT * FROM dns_soa WHERE active = y AND ?", $queryOr) != null) {
 						$le_domains[] = $temp_domain;
 						$app->log("Verified domain " . $temp_domain . " has a DNS zone in this setup for the acme (Let's Encrypt) challenge.", LOGLEVEL_DEBUG);
 					} else {
