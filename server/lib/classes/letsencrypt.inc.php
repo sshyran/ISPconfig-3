@@ -96,7 +96,7 @@ class letsencrypt {
 			foreach($dns_variables as $dns_variable) {
 				$dns_variables_cmd .= "export " . $dns_variable . ' ; ';
 			}
-			$dns = ' --dns dns_ispconfig ';
+			$dns = '--dns dns_ispconfig';
 		}
 
 		if($dns == '') {
