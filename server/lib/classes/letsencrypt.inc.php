@@ -97,6 +97,8 @@ class letsencrypt {
 				$dns_variables_cmd .= "export " . $dns_variable . ' ; ';
 			}
 			$dns = '--dns dns_ispconfig';
+		} else { // use HTTP-01 verification 
+			$cmd .= " -w /usr/local/ispconfig/interface/acme";
 		}
 
 		if($dns == '') {
@@ -107,7 +109,7 @@ class letsencrypt {
 			return false;
 		}
 
-		$cmd = $dns_variables_cmd . 'R=0 ; C=0 ; ' . $letsencrypt . ' --issue ' . $dns . $cmd . ' -w /usr/local/ispconfig/interface/acme --always-force-new-domain-key --keylength 4096; R=$? ; if [ $R -eq 0 -o $R -eq 2 ] ; then ' . $letsencrypt . ' --install-cert ' . $cmd . ' --key-file ' . escapeshellarg($key_file) . ' ' . $cert_arg . ' --reloadcmd ' . escapeshellarg($this->get_reload_command()) . ' --log ' . escapeshellarg($conf['ispconfig_log_dir'].'/acme.log') . '; C=$? ; fi ; if [ $C -eq 0 ] ; then exit $R ; else exit $C  ; fi';
+		$cmd = $dns_variables_cmd . 'R=0 ; C=0 ; ' . $letsencrypt . ' --issue ' . $dns . $cmd . ' --always-force-new-domain-key --keylength 4096 --log ' . escapeshellarg($conf['ispconfig_log_dir'].'/acme.log') . ' ; R=$? ; if [ $R -eq 0 -o $R -eq 2 ] ; then ' . $letsencrypt . ' --install-cert ' . $cmd . ' --key-file ' . escapeshellarg($key_file) . ' ' . $cert_arg . ' --reloadcmd ' . escapeshellarg($this->get_reload_command()) . ' --log ' . escapeshellarg($conf['ispconfig_log_dir'].'/acme.log') . '; C=$? ; fi ; if [ $C -eq 0 ] ; then exit $R ; else exit $C  ; fi';
 
 		return $cmd;
 	}
@@ -381,7 +383,7 @@ class letsencrypt {
 		$aliasdomains = null;
 
 		//* be sure to have good domain
-		if(substr($domain,0,4) != 'www.' && ($data['new']['subdomain'] == "www" || $data['new']['subdomain'] == "*")) {
+		if(substr($domain,0,4) != 'www.' && ($data['new']['subdomain'] == "www" || ($data['new']['subdomain'] == "*" && ($use_acme = FALSE || $global_sites_config['acme_dns_user'] == '')))) {
 			$temp_domains[] = "www." . $domain;
 		}
 
@@ -398,7 +400,7 @@ class letsencrypt {
 		if(is_array($aliasdomains)) {
 			foreach($aliasdomains as $aliasdomain) {
 				$temp_domains[] = $aliasdomain['domain'];
-				if(isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['subdomain'] == "www" OR $aliasdomain['subdomain'] == "*")) {
+				if(isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['subdomain'] == "www" OR ($data['new']['subdomain'] == "*" && ($use_acme = FALSE || $global_sites_config['acme_dns_user'] == '')))) {
 					$temp_domains[] = "www." . $aliasdomain['domain'];
 				}
 			}
