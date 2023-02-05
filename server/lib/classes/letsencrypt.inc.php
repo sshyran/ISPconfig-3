@@ -434,7 +434,6 @@ class letsencrypt {
 						if (isset($temp_domain_parts['1'])) {
 							$queryDomains[] = preg_replace("/.*" . $temp_domain_parts['0'] . "\." . "/", "", $temp_domain);
 							array_shift($temp_domain_parts);
-							print_r($temp_domain_parts);
 						}
 					}
 					$queryOr = "origin = " . $temp_domain . ".";
