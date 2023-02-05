@@ -88,13 +88,13 @@ class letsencrypt {
 				$dns_ISPC_Api_Insecure = "0";
 			}
 			$dns_variables = array();
-			$dns_variables[] = "ISPC_User=" . $dns_ISPC_User;
-			$dns_variables[] = "ISPC_Password=" . $dns_ISPC_Password;
-			$dns_variables[] = "ISPC_Api=" . $dns_ISPC_Api;
-			$dns_variables[] = "ISPC_Api_Insecure=" . $dns_ISPC_Api_Insecure;
+			$dns_variables[] = "ISPC_User='" . $dns_ISPC_User . "'";
+			$dns_variables[] = "ISPC_Password='" . $dns_ISPC_Password . "'";
+			$dns_variables[] = "ISPC_Api='" . $dns_ISPC_Api . "'";
+			$dns_variables[] = "ISPC_Api_Insecure='" . $dns_ISPC_Api_Insecure . "'";
 			$dns_variables_cmd = '';
 			foreach($dns_variables as $dns_variable) {
-				$dns_variables_cmd .= $dns_variable . ' ; ';
+				$dns_variables_cmd .= "export " . $dns_variable . ' ; ';
 			}
 			$dns = ' --dns dns_ispconfig ';
 		}
