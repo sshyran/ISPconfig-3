@@ -436,12 +436,12 @@ class letsencrypt {
 							array_shift($temp_domain_parts);
 						}
 					}
-					$queryOr = "origin = " . $temp_domain . ".";
-					foreach ($queryDomains as $domain) {
-						$queryOr .= " OR origin = " . $domain . ".";
+					$queryOr = "origin = '" . $temp_domain . ".'";
+					foreach ($queryDomains as $queryDomain) {
+						$queryOr .= " OR origin = '" . $queryDomain . ".'";
 					}
-					
-					if($app->dbmaster->queryOneRecord("SELECT * FROM dns_soa WHERE active = y AND ?", $queryOr) != null) {
+					$sql = "SELECT * FROM dns_soa WHERE active = 'y' AND " . $queryOr;
+					if (is_array($app->dbmaster->queryOneRecord($sql))) {
 						$le_domains[] = $temp_domain;
 						$app->log("Verified domain " . $temp_domain . " has a DNS zone in this setup for the acme (Let's Encrypt) challenge.", LOGLEVEL_DEBUG);
 					} else {
