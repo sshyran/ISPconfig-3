@@ -311,7 +311,7 @@ class letsencrypt {
 
 		if($data['new']['ssl'] == 'y' && $data['new']['ssl_letsencrypt'] == 'y') {
 			$domain = $data['new']['domain'];
-			if(substr($domain, 0, 2) === '*.' && $use_acme = false) {
+			if(substr($domain, 0, 2) === '*.' && !$use_acme) {
 				// DNS-01 verification is needed for wildcard certificate requests, but we do not support that for Certbot.
 				$app->log('Requesting a wildcard certificate from Let\'s Encrypt is not support when using certbot, so changing ' . $domain . ' to ' . substr($domain, 2), LOGLEVEL_WARN);
 				$domain = substr($domain, 2);
@@ -354,6 +354,7 @@ class letsencrypt {
 		$app->uses('getconf');
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 		$server_config = $app->getconf->get_server_config($conf['server_id'], 'server');
+		$global_sites_config = $app->getconf->get_global_config('sites');
 
 		$use_acme = false;
 		if($this->get_acme_script()) {
@@ -383,8 +384,10 @@ class letsencrypt {
 		$aliasdomains = null;
 
 		//* be sure to have good domain
-		if(substr($domain,0,4) != 'www.' && ($data['new']['subdomain'] == "www" || ($data['new']['subdomain'] == "*" && ($use_acme = FALSE || $global_sites_config['acme_dns_user'] == '')))) {
+		if(substr($domain,0,4) != 'www.' && ($data['new']['subdomain'] == "www" || ($data['new']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '')))) {
 			$temp_domains[] = "www." . $domain;
+		} elseif ($data['new']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '')) {
+			$temp_domains[] = "*." . $domain;
 		}
 
 		//* then, add subdomain if we have
@@ -400,7 +403,7 @@ class letsencrypt {
 		if(is_array($aliasdomains)) {
 			foreach($aliasdomains as $aliasdomain) {
 				$temp_domains[] = $aliasdomain['domain'];
-				if(isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['subdomain'] == "www" OR ($data['new']['subdomain'] == "*" && ($use_acme = FALSE || $global_sites_config['acme_dns_user'] == '')))) {
+				if(isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['subdomain'] == "www" OR $aliasdomain['subdomain'] == "*")) {
 					$temp_domains[] = "www." . $aliasdomain['domain'];
 				}
 			}
@@ -422,7 +425,7 @@ class letsencrypt {
 			if((isset($web_config['skip_le_check']) && $web_config['skip_le_check'] == 'y') || (isset($server_config['migration_mode']) && $server_config['migration_mode'] == 'y')) {
 				$le_domains[] = $temp_domain;
 			} else {
-				if($global_sites_config['acme_dns_user'] != '') {
+				if($global_sites_config['acme_dns_user'] == '' || !$use_acme) {
 					$le_hash_check = trim(@file_get_contents('http://' . $temp_domain . '/.well-known/acme-challenge/' . $le_rnd_file));
 					if($le_hash_check == $le_rnd_hash) {
 						$le_domains[] = $temp_domain;
