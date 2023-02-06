@@ -437,7 +437,7 @@ class letsencrypt {
 					$temp_domain_parts = preg_split("/[.]/", $temp_domain);
 					foreach ($temp_domain_parts as $temp_domain_part) {
 						if (isset($temp_domain_parts['1'])) {
-							$queryDomains[] = preg_replace("/.*" . $temp_domain_parts['0'] . "\." . "/", "", $temp_domain);
+							$queryDomains[] = preg_replace("/.*" . preg_quote($temp_domain_parts['0']) . "\." . "/", "", $temp_domain);
 							array_shift($temp_domain_parts);
 						}
 					}
