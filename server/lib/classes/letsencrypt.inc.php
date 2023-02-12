@@ -403,8 +403,10 @@ class letsencrypt {
 		if(is_array($aliasdomains)) {
 			foreach($aliasdomains as $aliasdomain) {
 				$temp_domains[] = $aliasdomain['domain'];
-				if(isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['subdomain'] == "www" OR $aliasdomain['subdomain'] == "*")) {
+				if (isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['domain']['subdomain'] == "www" || ($aliasdomain['domain']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '')))) {
 					$temp_domains[] = "www." . $aliasdomain['domain'];
+				} elseif ($aliasdomain['domain']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '')) {
+					$temp_domains[] = "*." . $aliasdomain['domain'];
 				}
 			}
 		}
