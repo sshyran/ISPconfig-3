@@ -438,10 +438,8 @@ class letsencrypt {
 				} else { // DNS-01 verification
 					$temp_domain_parts = preg_split("/[.]/", $temp_domain);
 					foreach ($temp_domain_parts as $temp_domain_part) {
-						if (isset($temp_domain_parts['1'])) {
-							$queryDomains[] = preg_replace("/.*" . preg_quote($temp_domain_parts['0']) . "\." . "/", "", $temp_domain);
-							array_shift($temp_domain_parts);
-						}
+						$queryDomains[] = preg_replace("/.*" . preg_quote($temp_domain_parts['0']) . "\." . "/", "", $temp_domain);
+						array_shift($temp_domain_parts);
 					}
 					foreach ($queryDomains as $queryDomain) {
 						$sql = "SELECT * FROM dns_soa WHERE active = 'y' AND origin = '" . $queryDomain . ".'";
