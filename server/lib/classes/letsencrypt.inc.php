@@ -499,7 +499,8 @@ class letsencrypt {
 				$app->log("Let's Encrypt SSL Cert domains: $cli_domain_arg", LOGLEVEL_DEBUG);
 
 				if ($use_acme && $global_sites_config['acme_dns_user'] != '' && $dns_server_id == $conf["server_id"]) {
-					$firstrun = true;
+					$success = $app->system->_exec("(" . $letsencrypt_cmd . ") > /dev/null &", $allow_return_codes); // the code below seems not be needed, written on 13-02-2023. It can be removed if acme.sh with DNS-01 verification works well on single server setups.
+					/*$firstrun = true;
 					$dns_config = $app->getconf->get_server_config($conf["server_id"], 'dns');
 					$zonefile = $dns_config['bind_zonefiles_dir'].'/'. "pri." . $zonedomain;
 					$datalogfound = false;
@@ -511,12 +512,12 @@ class letsencrypt {
 						$sql = "SELECT data FROM sys_datalog,server WHERE sys_datalog.server_id = \"1\" AND sys_datalog.datalog_id > server.updated AND sys_datalog.dbtable = 'dns_rr' AND data LIKE '%_acme-challenge%'";
 						$datalogs = $app->dbmaster->queryAllRecords($sql);
 						if (is_array($datalogs)) {
-							$app->log("Found datalog for acme-challenge, appending to zonefile.", LOGLEVEL_DEBUG);
 							foreach ($datalogs as $datalog) {
 								$datalog = unserialize($datalog['data']);
 								$hostname = $datalog['new']['name'];
 								$data = $datalog['new']['data'];
 								$record = "\n" . $hostname . "." . $zonedomain . "." . " 3600      TXT        \"" . $data . "\"";
+								$app->log("Found datalog for acme-challenge, appending to zonefile with record: " . $record, LOGLEVEL_DEBUG);
 								$app->system->file_put_contents($zonefile, $record);
 							}
 							$app->services->registerService('bind', 'dns_module', 'restartBind');
@@ -529,7 +530,7 @@ class letsencrypt {
 							$app->log("Can not find the datalog for the acme-challenge yet, waiting 20 seconds.", LOGLEVEL_DEBUG);
 							sleep(20);
 						}
-					}
+					}*/
 				} else {
 					$success = $app->system->_exec($letsencrypt_cmd, $allow_return_codes);
 				}
