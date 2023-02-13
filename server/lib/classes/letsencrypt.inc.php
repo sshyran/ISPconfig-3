@@ -78,7 +78,7 @@ class letsencrypt {
 		}
 
 		$dns = '';
-		if($global_sites_config['acme_dns_user'] != '') {
+		if($global_sites_config['acme_dns_user'] != '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false)) {
 			$dns_ISPC_User = $global_sites_config['acme_dns_user'];
 			$dns_ISPC_Password = $global_sites_config['acme_dns_password'];
 			$dns_ISPC_Api = $global_sites_config['acme_dns_api'];
@@ -384,9 +384,9 @@ class letsencrypt {
 		$aliasdomains = null;
 
 		//* be sure to have good domain
-		if(substr($domain,0,4) != 'www.' && ($data['new']['subdomain'] == "www" || ($data['new']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '')))) {
+		if(substr($domain,0,4) != 'www.' && ($data['new']['subdomain'] == "www" || ($data['new']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))))) {
 			$temp_domains[] = "www." . $domain;
-		} elseif ($data['new']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '')) {
+		} elseif ($data['new']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))) {
 			$temp_domains[] = "*." . $domain;
 		}
 
@@ -403,9 +403,9 @@ class letsencrypt {
 		if(is_array($aliasdomains)) {
 			foreach($aliasdomains as $aliasdomain) {
 				$temp_domains[] = $aliasdomain['domain'];
-				if (isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['domain']['subdomain'] == "www" || ($aliasdomain['domain']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '')))) {
+				if (isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['domain']['subdomain'] == "www" || ($aliasdomain['domain']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))))) {
 					$temp_domains[] = "www." . $aliasdomain['domain'];
-				} elseif ($aliasdomain['domain']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '')) {
+				} elseif ($aliasdomain['domain']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))) {
 					$temp_domains[] = "*." . $aliasdomain['domain'];
 				}
 			}
@@ -427,7 +427,7 @@ class letsencrypt {
 			if((isset($web_config['skip_le_check']) && $web_config['skip_le_check'] == 'y') || (isset($server_config['migration_mode']) && $server_config['migration_mode'] == 'y')) {
 				$le_domains[] = $temp_domain;
 			} else {
-				if($global_sites_config['acme_dns_user'] == '' || !$use_acme) {
+				if($global_sites_config['acme_dns_user'] == '' || !$use_acme || (isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == true)) {
 					$le_hash_check = trim(@file_get_contents('http://' . $temp_domain . '/.well-known/acme-challenge/' . $le_rnd_file));
 					if($le_hash_check == $le_rnd_hash) {
 						$le_domains[] = $temp_domain;
@@ -443,12 +443,16 @@ class letsencrypt {
 							array_shift($temp_domain_parts);
 						}
 					}
-					$queryOr = "origin = '" . $temp_domain . ".'";
 					foreach ($queryDomains as $queryDomain) {
-						$queryOr .= " OR origin = '" . $queryDomain . ".'";
+						$sql = "SELECT * FROM dns_soa WHERE active = 'y' AND origin = '" . $queryDomain . ".'";
+						if (is_array($app->dbmaster->queryOneRecord($sql))) {
+							$zoneExists = true;
+							$zonedomain = $queryDomain;
+							$dns_server_id = $sql['server_id'];
+							break;
+						}
 					}
-					$sql = "SELECT * FROM dns_soa WHERE active = 'y' AND " . $queryOr;
-					if (is_array($app->dbmaster->queryOneRecord($sql))) {
+					if ($zoneExists) {
 						$le_domains[] = $temp_domain;
 						$app->log("Verified domain " . $temp_domain . " has a DNS zone in this setup for the acme (Let's Encrypt) challenge.", LOGLEVEL_DEBUG);
 					} else {
@@ -488,12 +492,38 @@ class letsencrypt {
 		}
 
 		$success = false;
+
+		
 		if($letsencrypt_cmd) {
 			if(!isset($server_config['migration_mode']) || $server_config['migration_mode'] != 'y') {
 				$app->log("Create Let's Encrypt SSL Cert for: $domain", LOGLEVEL_DEBUG);
 				$app->log("Let's Encrypt SSL Cert domains: $cli_domain_arg", LOGLEVEL_DEBUG);
 
-				$success = $app->system->_exec($letsencrypt_cmd, $allow_return_codes);
+				if ($use_acme && $global_sites_config['acme_dns_user'] != '' && $dns_server_id == $conf["server_id"]) {
+					$dns_config = $app->getconf->get_server_config($conf["server_id"], 'dns');
+					$zonefile = $dns_config['bind_zonefiles_dir'].'/'. "pri." . $zonedomain;
+					$datalogfound = false;
+					while ($success = $app->system->_exec($letsencrypt_cmd, $allow_return_codes)) {
+						while (!$datalogfound) {
+							$sql = "SELECT data FROM sys_datalog WHERE dbtable = 'dns_rr' AND data LIKE '%_acme-challenge%' AND status = 'pending'";
+							$datalogs = $app->dbmaster->queryAllRecords($sql);
+							if (is_array($datalogs)) {
+								foreach ($datalogs as $datalog) {
+									$datalog = unserialize($datalog);
+									$hostname = $datalog['new']['name'];
+									$data = $datalog['new']['data'];
+									$record = "\n" . $hostname . "." . $zonedomain . "." . " 3600      TXT        \"" . $data . "\"";
+									file_put_contents($zonefile, $record, FILE_APPEND | LOCK_EX);
+								}
+								$app->services->restartService('named', 'restart');
+								$datalogfound = true;
+								break;
+							}
+						}
+					}
+				} else {
+					$success = $app->system->_exec($letsencrypt_cmd, $allow_return_codes);
+				}
 			} else {
 				$app->log("Migration mode active, skipping Let's Encrypt SSL Cert creation for: $domain", LOGLEVEL_DEBUG);
 				$success = true;
