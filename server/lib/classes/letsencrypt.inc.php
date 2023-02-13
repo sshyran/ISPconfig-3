@@ -505,23 +505,29 @@ class letsencrypt {
 					$datalogfound = false;
 					while (!$datalogfound) {
 						if ($firstrun == true) {
-							$success = $app->system->_exec($letsencrypt_cmd, $allow_return_codes);
+							$success = $app->system->_exec("(" . $letsencrypt_cmd . ") > /dev/null &", $allow_return_codes);
 							$firstrun = false;
 						}
-						$sql = "SELECT data FROM sys_datalog WHERE dbtable = 'dns_rr' AND data LIKE '%_acme-challenge%' AND status = 'pending'";
+						$sql = "SELECT data FROM sys_datalog,server WHERE sys_datalog.server_id = \"1\" AND sys_datalog.datalog_id > server.updated AND sys_datalog.dbtable = 'dns_rr' AND data LIKE '%_acme-challenge%'";
 						$datalogs = $app->dbmaster->queryAllRecords($sql);
 						if (is_array($datalogs)) {
+							$app->log("Found datalog for acme-challenge, appending to zonefile.", LOGLEVEL_DEBUG);
 							foreach ($datalogs as $datalog) {
-								$datalog = unserialize($datalog);
+								$datalog = unserialize($datalog['data']);
 								$hostname = $datalog['new']['name'];
 								$data = $datalog['new']['data'];
 								$record = "\n" . $hostname . "." . $zonedomain . "." . " 3600      TXT        \"" . $data . "\"";
-								file_put_contents($zonefile, $record, FILE_APPEND | LOCK_EX);
+								$app->system->file_put_contents($zonefile, $record);
 							}
 							$app->services->registerService('bind', 'dns_module', 'restartBind');
 							$app->services->restartService('bind', 'restart');
+							$app->log("Waiting for acme.sh script to finish.", LOGLEVEL_DEBUG);
+							sleep(60);
 							$datalogfound = true;
 							break;
+						} else {
+							$app->log("Can not find the datalog for the acme-challenge yet, waiting 20 seconds.", LOGLEVEL_DEBUG);
+							sleep(20);
 						}
 					}
 				} else {
