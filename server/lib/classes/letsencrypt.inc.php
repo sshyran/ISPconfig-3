@@ -445,10 +445,11 @@ class letsencrypt {
 					}
 					foreach ($queryDomains as $queryDomain) {
 						$sql = "SELECT * FROM dns_soa WHERE active = 'y' AND origin = '" . $queryDomain . ".'";
-						if (is_array($app->dbmaster->queryOneRecord($sql))) {
+						$soa = $app->dbmaster->queryOneRecord($sql);
+						if (is_array($soa)) {
 							$zoneExists = true;
 							$zonedomain = $queryDomain;
-							$dns_server_id = $sql['server_id'];
+							$dns_server_id = $soa['server_id'];
 							break;
 						}
 					}
@@ -500,25 +501,29 @@ class letsencrypt {
 				$app->log("Let's Encrypt SSL Cert domains: $cli_domain_arg", LOGLEVEL_DEBUG);
 
 				if ($use_acme && $global_sites_config['acme_dns_user'] != '' && $dns_server_id == $conf["server_id"]) {
+					$firstrun = true;
 					$dns_config = $app->getconf->get_server_config($conf["server_id"], 'dns');
 					$zonefile = $dns_config['bind_zonefiles_dir'].'/'. "pri." . $zonedomain;
 					$datalogfound = false;
-					while ($success = $app->system->_exec($letsencrypt_cmd, $allow_return_codes)) {
-						while (!$datalogfound) {
-							$sql = "SELECT data FROM sys_datalog WHERE dbtable = 'dns_rr' AND data LIKE '%_acme-challenge%' AND status = 'pending'";
-							$datalogs = $app->dbmaster->queryAllRecords($sql);
-							if (is_array($datalogs)) {
-								foreach ($datalogs as $datalog) {
-									$datalog = unserialize($datalog);
-									$hostname = $datalog['new']['name'];
-									$data = $datalog['new']['data'];
-									$record = "\n" . $hostname . "." . $zonedomain . "." . " 3600      TXT        \"" . $data . "\"";
-									file_put_contents($zonefile, $record, FILE_APPEND | LOCK_EX);
-								}
-								$app->services->restartService('named', 'restart');
-								$datalogfound = true;
-								break;
+					while (!$datalogfound) {
+						if ($firstrun == true) {
+							$success = $app->system->_exec($letsencrypt_cmd, $allow_return_codes);
+							$firstrun = false;
+						}
+						$sql = "SELECT data FROM sys_datalog WHERE dbtable = 'dns_rr' AND data LIKE '%_acme-challenge%' AND status = 'pending'";
+						$datalogs = $app->dbmaster->queryAllRecords($sql);
+						if (is_array($datalogs)) {
+							foreach ($datalogs as $datalog) {
+								$datalog = unserialize($datalog);
+								$hostname = $datalog['new']['name'];
+								$data = $datalog['new']['data'];
+								$record = "\n" . $hostname . "." . $zonedomain . "." . " 3600      TXT        \"" . $data . "\"";
+								file_put_contents($zonefile, $record, FILE_APPEND | LOCK_EX);
 							}
+							$app->services->registerService('bind', 'dns_module', 'restartBind');
+							$app->services->restartService('bind', 'restart');
+							$datalogfound = true;
+							break;
 						}
 					}
 				} else {
