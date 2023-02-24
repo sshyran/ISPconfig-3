@@ -382,11 +382,17 @@ class letsencrypt {
 		$cli_domain_arg = '';
 		$subdomains = null;
 		$aliasdomains = null;
+		$powerdns = (isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false);
 
 		//* be sure to have good domain
-		if(substr($domain,0,4) != 'www.' && ($data['new']['subdomain'] == "www" || ($data['new']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))))) {
+		if (substr($domain, 0, 4) != 'www.'
+			&& ($data['new']['subdomain'] == "www"
+				|| ($data['new']['subdomain'] == "*"
+					&& (!$powerdns && !$use_acme || $global_sites_config['acme_dns_user'] == '')))) {
 			$temp_domains[] = "www." . $domain;
-		} elseif ($data['new']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))) {
+		}
+		elseif ($data['new']['subdomain'] == "*"
+				&& (!$powerdns && $use_acme && $global_sites_config['acme_dns_user'] != '')) {
 			$temp_domains[] = "*." . $domain;
 		}
 
@@ -403,9 +409,9 @@ class letsencrypt {
 		if(is_array($aliasdomains)) {
 			foreach($aliasdomains as $aliasdomain) {
 				$temp_domains[] = $aliasdomain['domain'];
-				if (isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['domain']['subdomain'] == "www" || ($aliasdomain['domain']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))))) {
+				if (isset($aliasdomain['subdomain']) && substr($aliasdomain['domain'],0,4) != 'www.' && ($aliasdomain['domain']['subdomain'] == "www" || ($aliasdomain['domain']['subdomain'] == "*" && (!$use_acme || $global_sites_config['acme_dns_user'] == '' && !$powerdns)))) {
 					$temp_domains[] = "www." . $aliasdomain['domain'];
-				} elseif ($aliasdomain['domain']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '' && (!isset($conf['powerdns']['installed']) || isset($conf['powerdns']['installed']) && $conf['powerdns']['installed'] == false))) {
+				} elseif ($aliasdomain['domain']['subdomain'] == "*" && ($use_acme && $global_sites_config['acme_dns_user'] != '' && !$powerdns)) {
 					$temp_domains[] = "*." . $aliasdomain['domain'];
 				}
 			}
